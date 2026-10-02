@@ -1,0 +1,107 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model MediaAsset {
+  id               String   @id @default(cuid())
+  publicId         String   @unique
+  secureUrl        String
+  url              String
+  originalFilename String
+  format           String
+  resourceType     String   @default("image")
+  width            Int
+  height           Int
+  bytes            Int
+  optimizedBytes   Int?
+  savingsPercent   Float?
+  
+  // AI & Intelligence
+  category         String?
+  confidence       Float?
+  healthScore      Int      @default(80)
+  
+  // Moderation
+  safetyStatus     String   @default("SAFE") // SAFE, REQUIRES_REVIEW, FLAGGED
+  moderationScore  Int      @default(100)
+  moderationDetail String?  // JSON string: { adult, violence, hate, weapons, reasons }
+  
+  // Pipeline & Execution metadata
+  isDemo           Boolean  @default(false)
+  processingStatus String   @default("COMPLETED") // PENDING, PROCESSING, COMPLETED, FAILED
+  colorPalette     String?  // JSON string array of hex colors
+  etag             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  tags             MediaTag[]
+  detectedObjects  MediaObject[]
+  transformations  MediaTransformation[]
+  metadata         MediaMetadata[]
+
+  @@index([safetyStatus])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model MediaTag {
+  id         String     @id @default(cuid())
+  assetId    String
+  name       String
+  confidence Float?
+  source     String     @default("cloudinary_ai") // cloudinary_ai, user, fallback
+  createdAt  DateTime   @default(now())
+
+  asset      MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([name])
+  @@index([assetId])
+}
+
+model MediaObject {
+  id          String     @id @default(cuid())
+  assetId     String
+  name        String
+  confidence  Float
+  boundingBox String?    // JSON string: { x, y, width, height }
+  createdAt   DateTime   @default(now())
+
+  asset       MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+}
+
+model MediaTransformation {
+  id             String     @id @default(cuid())
+  assetId        String
+  presetName     String     // e.g. "instagram_square", "bg_removed", "optimized", etc.
+  transformation String     // Cloudinary transformation string
+  url            String
+  format         String?
+  width          Int?
+  height         Int?
+  bytes          Int?
+  createdAt      DateTime   @default(now())
+
+  asset          MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+}
+
+model MediaMetadata {
+  id        String     @id @default(cuid())
+  assetId   String
+  key       String
+  value     String
+  createdAt DateTime   @default(now())
+
+  asset     MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+}
